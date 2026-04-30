@@ -1,0 +1,1164 @@
+<!DOCTYPE html>
+<html lang="lo">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PRE-POST TEST DASHBOARD</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <style>
+        body {
+            font-family: 'Inter', 'Noto Sans Lao', sans-serif, system-ui;
+            background-color: #f8fafc;
+        }
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 1000px;
+            margin-left: auto;
+            margin-right: auto;
+            height: 40vh;
+            max-height: 400px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        @media (min-width: 768px) {
+            .chart-container {
+                height: 50vh;
+                max-height: 500px;
+            }
+        }
+        .metric-card {
+            transition: transform 0.2s ease-in-out;
+        }
+        .metric-card:hover {
+            transform: translateY(-5px);
+        }
+        #toast {
+            transition: all 0.3s ease-in-out;
+        }
+        .print-avoid-break {
+            page-break-inside: avoid;
+        }
+    </style>
+</head>
+<body class="text-slate-800 antialiased" id="pdf-content">
+
+    <nav id="main-nav" class="bg-blue-900 text-white sticky top-0 z-50 shadow-md">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <div class="flex items-center space-x-3">
+                    <span class="text-2xl">&#128202;</span>
+                    <span class="font-bold text-xl tracking-wide leading-tight">ກະດານສະແດງຜົນການທົດສອບ ກ່ອນ-ຫຼັງ<br><span class="text-sm font-normal text-blue-200">PRE-POST TEST DASHBOARD</span></span>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <header class="bg-white border-b border-slate-200 py-12 print-avoid-break">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+            <h1 id="dashboard-title" class="text-3xl md:text-5xl font-extrabold text-blue-900 mb-4 leading-tight">ການປະເມີນກ່ອນ ແລະ ຫຼັງ ການຝຶກອົບຮົມ<br><span class="text-2xl md:text-3xl text-slate-500 font-bold block mt-2">RDQA Tool Modifications</span></h1>
+            <p id="dashboard-subtitle" class="text-lg md:text-xl text-slate-500 max-w-3xl mx-auto">
+                <span class="font-semibold text-blue-700">&#128205; <span id="loading-text">ກຳລັງໂຫຼດຂໍ້ມູນ... (Loading data...)</span></span>
+            </p>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-10">
+
+        <!-- Controls Section (Import/Export/Clear) -->
+        <section id="controls-section" class="bg-white rounded-xl shadow-sm border border-slate-200 p-5 flex flex-col items-start gap-4 border-l-4 border-blue-500 print-avoid-break">
+            <div class="w-full mb-1">
+                <h3 class="text-lg font-bold text-slate-800 flex items-center gap-2">
+                    <span>&#128193;</span> ການຈັດການຂໍ້ມູນ (Data Management)
+                </h3>
+                <p class="text-sm text-slate-500 mt-1">ທ່ານສາມາດອັບໂຫຼດໄຟລ໌ Excel/CSV ຂອງທ່ານຢູ່ທີ່ນີ້.<br>(You can manually upload your Excel/CSV here.)</p>
+            </div>
+            <div class="flex gap-3 flex-wrap w-full">
+                <div class="relative">
+                    <input type="file" id="fileUpload" class="hidden" accept=".xlsx, .xls, .csv">
+                    <label for="fileUpload" id="fileUploadLabel" class="cursor-pointer bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 px-5 rounded-lg shadow-sm transition-colors flex items-center gap-2">
+                        <span class="text-lg">&#128228;</span>
+                        <span class="leading-tight text-sm text-left">ນຳເຂົ້າໄຟລ໌...<br><span class="text-xs font-normal text-blue-200">Import File...</span></span>
+                    </label>
+                </div>
+                <button id="exportBtn" class="bg-rose-600 hover:bg-rose-700 text-white font-medium py-2.5 px-5 rounded-lg shadow-sm transition-colors flex items-center gap-2 ml-auto">
+                    <span class="text-lg">&#128196;</span>
+                    <span class="leading-tight text-sm text-left">ສົ່ງອອກ PDF<br><span class="text-xs font-normal text-rose-200">Export PDF</span></span>
+                </button>
+            </div>
+        </section>
+
+        <!-- Filter Section -->
+        <section id="filter-section" class="bg-white rounded-xl shadow-sm border border-slate-200 p-5 flex flex-col items-start gap-3 print-avoid-break">
+            <div class="flex items-center gap-2 text-slate-700 font-bold">
+                <span class="text-lg">&#128269;</span>
+                <span>ກັ່ນຕອງຂໍ້ມູນ (Filter Data):</span>
+            </div>
+            <div class="flex flex-col sm:flex-row gap-3 w-full">
+                <select id="participantFromFilter" class="bg-slate-50 border border-slate-300 text-slate-700 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full sm:w-[250px] p-2.5">
+                    <option value="">-- ຜູ້ເຂົ້າຮ່ວມທັງໝົດຈາກ (All Participants From) --</option>
+                </select>
+                <select id="monthFilter" class="bg-slate-50 border border-slate-300 text-slate-700 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full sm:w-[160px] p-2.5">
+                    <option value="">-- ທຸກໆເດືອນ (All Months) --</option>
+                </select>
+            </div>
+        </section>
+
+        <!-- KPIs Section -->
+        <section class="print-avoid-break">
+            <div class="mb-6">
+                <h2 class="text-2xl font-bold text-slate-800 border-l-4 border-amber-500 pl-3 leading-tight">ພາບລວມການປະເມີນຜົນ<br><span class="text-lg text-slate-500 font-normal">Evaluation Overview</span></h2>
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <div class="metric-card bg-white rounded-xl shadow-sm border border-slate-100 p-6 flex flex-col items-center text-center">
+                    <div class="text-4xl mb-2">&#128101;</div>
+                    <div class="text-slate-500 font-medium text-sm uppercase tracking-wider leading-tight">ຜູ້ເຂົ້າຮ່ວມທັງໝົດ<br><span class="text-xs normal-case">Total Participants (Pre)</span></div>
+                    <div class="text-4xl font-black text-blue-900 mt-1"><span id="kpi-count">0</span> <span class="text-lg font-normal text-slate-400">ຄົນ (Pax)</span></div>
+                </div>
+                <div class="metric-card bg-white rounded-xl shadow-sm border border-slate-100 p-6 flex flex-col items-center text-center">
+                    <div class="text-4xl mb-2">&#128200;</div>
+                    <div class="text-slate-500 font-medium text-sm uppercase tracking-wider leading-tight">ຄະແນນສະເລ່ຍກ່ອນການຝຶກ<br><span class="text-xs normal-case">Average Score (Pre)</span></div>
+                    <div class="text-4xl font-black text-[#35675D] mt-1"><span id="kpi-pre-pct">0%</span></div>
+                    <div id="kpi-pre-score" class="text-sm text-slate-400 mt-1">0 / 20 ຄະແນນ (points)</div>
+                </div>
+                <div class="metric-card bg-white rounded-xl shadow-sm border border-slate-100 p-6 flex flex-col items-center text-center">
+                    <div class="text-4xl mb-2">&#127919;</div>
+                    <div class="text-slate-500 font-medium text-sm uppercase tracking-wider leading-tight">ຄະແນນສະເລ່ຍຫຼັງການຝຶກ<br><span class="text-xs normal-case">Average Score (Post)</span></div>
+                    <div class="text-4xl font-black text-[#BF5A38] mt-1"><span id="kpi-post-pct">0%</span></div>
+                    <div id="kpi-post-score" class="text-sm text-slate-400 mt-1">0 / 20 ຄະແນນ (points)</div>
+                </div>
+                <div class="metric-card bg-gradient-to-br from-blue-600 to-blue-800 rounded-xl shadow-md p-6 flex flex-col items-center text-center text-white">
+                    <div class="text-4xl mb-2">&#11088;</div>
+                    <div class="text-blue-200 font-medium text-sm uppercase tracking-wider leading-tight">ອັດຕາການພັດທະນາ<br><span class="text-xs normal-case text-blue-300">Improvement Rate</span></div>
+                    <div class="text-4xl font-black text-amber-300 mt-1"><span id="kpi-diff">0%</span></div>
+                    <div class="text-sm text-blue-100 mt-1 leading-tight">ຄວາມຮູ້ເພີ່ມຂຶ້ນຢ່າງເຫັນໄດ້ຊັດເຈນ<br><span class="text-xs opacity-75">(Significant knowledge increase)</span></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Gender Chart Section -->
+        <section class="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 md:p-8 print-avoid-break">
+            <h3 class="text-xl font-bold text-slate-800 mb-1 leading-tight">ການປຽບທຽບຜົນໄດ້ຮັບແຍກຕາມເພດ<br><span class="text-base text-slate-500 font-normal">Result Comparison by Gender</span></h3>
+            <p class="text-sm text-slate-500 mb-6">ວິເຄາະຄວາມແຕກຕ່າງຂອງການໄດ້ຮັບຄວາມຮູ້ລະຫວ່າງຜູ້ເຂົ້າຮ່ວມຍິງ ແລະ ຊາຍ ເພື່ອປະເມີນຄວາມສະເໝີພາບ.<br>(Analyze the difference in knowledge gain between male and female participants to assess equity.)</p>
+            <div class="chart-container" style="height: 40vh; max-height: 400px;">
+                <canvas id="genderChart"></canvas>
+            </div>
+        </section>
+
+        <!-- Distribution Chart Section -->
+        <section class="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 md:p-8 print-avoid-break">
+            <h3 class="text-xl font-bold text-slate-800 mb-1 leading-tight">ການປ່ຽນແປງການກະຈາຍຂອງຄະແນນ<br><span class="text-base text-slate-500 font-normal">Score Distribution Changes</span></h3>
+            <p class="text-sm text-slate-500 mb-6">ກຣາຟນີ້ສະແດງໃຫ້ເຫັນການປ່ຽນແປງຂອງຜູ້ເຂົ້າຮ່ວມຈາກຊ່ວງຄະແນນຕໍ່າໄປຫາສູງຫຼັງການຝຶກອົບຮົມ.<br>(This chart illustrates the shift of participants from lower to higher score ranges post-training.)</p>
+            <div class="chart-container" style="height: 40vh; max-height: 400px;">
+                <canvas id="distributionChart"></canvas>
+            </div>
+        </section>
+
+        <!-- Question Analysis Section -->
+        <section class="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 md:p-8 print-avoid-break">
+            <h2 class="text-2xl font-bold text-slate-800 border-l-4 border-[#BF5A38] pl-3 mb-1 leading-tight">ການວິເຄາະຄວາມເຂົ້າໃຈແຍກຕາມຄຳຖາມ<br><span class="text-lg text-slate-500 font-normal">Comprehension Analysis by Question</span></h2>
+            <p class="text-slate-600 mb-8">ສະແດງເປີເຊັນຂອງຄຳຕອບທີ່ຖືກຕ້ອງສຳລັບແຕ່ລະຄຳຖາມ. ພື້ນທີ່ສີສະແດງເຖິງ 'ຊ່ອງຫວ່າງຄວາມຮູ້' ທີ່ຖືກຕື່ມເຕັມຫຼັງການຝຶກອົບຮົມ.<br><span class="text-sm text-slate-500">(Displays the percentage of correct answers for each question. The colored area represents the 'knowledge gap' filled after the training.)</span></p>
+            
+            <div class="chart-container" style="height: 50vh; max-height: 600px;">
+                <canvas id="questionChart"></canvas>
+            </div>
+            
+            <!-- Dynamic Analysis Section -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8">
+                <div class="bg-rose-50 p-5 rounded-xl border border-rose-100">
+                    <h4 id="attention-title" class="font-bold text-rose-800 flex items-center mb-3 pb-2 border-b border-rose-200 leading-tight">&#9888;&#65039; 3 ຄໍາຖາມທີ່ໄດ້ຄະແນນຕໍ່າ<br><span class="text-sm text-rose-600 font-normal ml-6">Bottom 3 Questions</span></h4>
+                    <ul id="attention-list" class="list-disc pl-5 text-sm text-rose-700 space-y-2">
+                        <li class="text-slate-400 italic">ກຳລັງປະມວນຜົນ... (Processing...)</li>
+                    </ul>
+                </div>
+                <div class="bg-blue-50 p-5 rounded-xl border border-blue-100">
+                    <h4 class="font-bold text-blue-800 flex items-center mb-3 pb-2 border-b border-blue-200 leading-tight">&#128204; ຂໍ້ແນະນຳໃນການປັບປຸງ<br><span class="text-sm text-blue-600 font-normal ml-6">Follow-up & Coaching Recommendations</span></h4>
+                    <ul id="recommendation-list" class="list-disc pl-5 text-sm text-blue-700 space-y-2">
+                        <li class="text-slate-400 italic">ກຳລັງປະມວນຜົນ... (Processing...)</li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+
+        <!-- Lowest Scores Section -->
+        <section class="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 md:p-8 print-avoid-break">
+            <h2 class="text-2xl font-bold text-slate-800 border-l-4 border-rose-500 pl-3 mb-6 leading-tight">ຄະແນນຕໍ່າສຸດ 3 ອັນດັບ<br><span class="text-lg text-slate-500 font-normal">Bottom 3 Scores</span></h2>
+            <div id="lowest-scores-container" class="border border-slate-200 rounded-lg overflow-hidden">
+                <p class="text-slate-400 italic p-4 text-center">ກຳລັງປະມວນຜົນ... (Processing...)</p>
+            </div>
+        </section>
+
+    </main>
+
+    <footer id="main-footer" class="bg-slate-800 text-slate-300 py-8 border-t-4 border-blue-500">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center text-sm flex flex-col items-center">
+            <div class="text-2xl mb-2">&#128187;</div>
+            <p>&copy; 2026 ລາຍງານການວິເຄາະຂໍ້ມູນ (Data Analysis Report).</p>
+        </div>
+    </footer>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="fixed bottom-6 right-6 px-6 py-4 rounded-xl shadow-2xl transform translate-y-32 opacity-0 flex items-center gap-3 z-50">
+        <span id="toastIcon" class="text-2xl"></span>
+        <span id="toastMessage" class="font-semibold text-sm"></span>
+    </div>
+
+    <script>
+        // --- Global Variable ---
+        window.allDashboardData = [];
+        window.QUESTION_DESCRIPTIONS = []; // Will be populated dynamically from CSV headers
+        let currentExportTopic = "Report";
+        let MAX_QUESTIONS = 20; // Default, will adjust dynamically based on data
+
+        // --- Toast Notification System ---
+        function showToast(message, type = 'success') {
+            const toast = document.getElementById('toast');
+            const toastIcon = document.getElementById('toastIcon');
+            const toastMessage = document.getElementById('toastMessage');
+            
+            toastMessage.textContent = message;
+            
+            if (type === 'success') {
+                toast.className = 'fixed bottom-6 right-6 px-6 py-4 rounded-xl shadow-2xl flex items-center gap-3 z-50 bg-emerald-500 text-white transform transition-all duration-300 translate-y-0 opacity-100';
+                toastIcon.innerHTML = '&#10004;&#65039;';
+            } else if (type === 'loading') {
+                toast.className = 'fixed bottom-6 right-6 px-6 py-4 rounded-xl shadow-2xl flex items-center gap-3 z-50 bg-blue-500 text-white transform transition-all duration-300 translate-y-0 opacity-100';
+                toastIcon.innerHTML = '&#8987;';
+            } else {
+                toast.className = 'fixed bottom-6 right-6 px-6 py-4 rounded-xl shadow-2xl flex items-center gap-3 z-50 bg-rose-500 text-white transform transition-all duration-300 translate-y-0 opacity-100';
+                toastIcon.innerHTML = '&#9888;&#65039;';
+            }
+
+            if (type !== 'loading') {
+                setTimeout(() => {
+                    toast.classList.remove('translate-y-0', 'opacity-100');
+                    toast.classList.add('translate-y-32', 'opacity-0');
+                }, 5000);
+            }
+        }
+
+        // --- Chart.js Configuration ---
+        Chart.register(ChartDataLabels);
+        Chart.defaults.font.family = "'Inter', 'Noto Sans Lao', sans-serif";
+        Chart.defaults.set('plugins.datalabels', {
+            color: '#334155',
+            font: { family: "'Inter', 'Noto Sans Lao', sans-serif", weight: 'bold', size: 11 },
+            anchor: 'end', align: 'top', offset: 4
+        });
+
+        function processLabel(label) {
+            const limit = 16;
+            if (label.length <= limit) return label;
+            const words = label.split(' ');
+            const lines = [];
+            let currentLine = '';
+            words.forEach(word => {
+                if ((currentLine + word).length > limit) {
+                    if (currentLine.trim() !== '') lines.push(currentLine.trim());
+                    currentLine = word + ' ';
+                } else {
+                    currentLine += word + ' ';
+                }
+            });
+            if (currentLine.trim() !== '') lines.push(currentLine.trim());
+            return lines;
+        }
+
+        const standardTooltipConfig = {
+            callbacks: {
+                title: function(tooltipItems) {
+                    const item = tooltipItems[0];
+                    let label = item.chart.data.labels[item.dataIndex];
+                    if (Array.isArray(label)) return label.join(' ');
+                    return label;
+                }
+            }
+        };
+
+        // --- Restored: cleanName function ---
+        function cleanName(name) {
+            if (!name) return "";
+            let cleaned = name.trim();
+            const fullPrefixes = /^(ທ້າວ|ນາງ|Miss|Ms\.|Ms|Mr\.|Mr|ດຣ\.|ດຣ|ພຊ\.|ພຊ|ປທ\.|ປທ|ປອ\.|ປອ)/i;
+            while (fullPrefixes.test(cleaned)) {
+                cleaned = cleaned.replace(fullPrefixes, '').trim();
+            }
+            const shortPrefixes = /^(ທ|ນ)[\.\s]+/i;
+            while (shortPrefixes.test(cleaned)) {
+                cleaned = cleaned.replace(shortPrefixes, '').trim();
+            }
+            return cleaned.trim();
+        }
+
+        window.myCharts = {};
+
+        // --- Restored: Custom tooltip for Question Chart ---
+        const questionTooltipConfig = {
+            callbacks: {
+                title: function(tooltipItems) {
+                    const index = tooltipItems[0].dataIndex;
+                    const qText = window.QUESTION_DESCRIPTIONS[index] || `Q${index + 1}`;
+                    const words = qText.split(' ');
+                    let lines = [];
+                    let currentLine = `Q${index + 1}: `;
+                    words.forEach(word => {
+                        if ((currentLine + word).length > 60) {
+                            lines.push(currentLine);
+                            currentLine = word + ' ';
+                        } else {
+                            currentLine += word + ' ';
+                        }
+                    });
+                    lines.push(currentLine.trim());
+                    return lines;
+                },
+                label: function(context) {
+                    return `${context.dataset.label}: ${context.parsed.y.toFixed(1)}%`;
+                }
+            }
+        };
+
+        // --- Restored: Initialize Charts (Empty Data Initially) ---
+        const ctxDist = document.getElementById('distributionChart').getContext('2d');
+        window.myCharts.dist = new Chart(ctxDist, {
+            type: 'bar',
+            data: {
+                labels: ["1-25%", "26-50%", "51-75%", "76-99%", "100% (Perfect)"].map(processLabel),
+                datasets: [
+                    { label: 'ກ່ອນການຝຶກອົບຮົມ (Pre-Training %)', data: [], backgroundColor: '#35675D', borderRadius: 4 },
+                    { label: 'ຫຼັງການຝຶກອົບຮົມ (Post-Training %)', data: [], backgroundColor: '#BF5A38', borderRadius: 4 }
+                ]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false, layout: { padding: { top: 20 } },
+                plugins: { legend: { position: 'bottom' }, tooltip: standardTooltipConfig, datalabels: { formatter: v => v > 0 ? v + '%' : '' } },
+                scales: { y: { beginAtZero: true, max: 110, title: { display: true, text: 'Participant Ratio (%)' } } }
+            }
+        });
+
+        const ctxGender = document.getElementById('genderChart').getContext('2d');
+        window.myCharts.gender = new Chart(ctxGender, {
+            type: 'bar',
+            data: {
+                labels: ["ຊາຍ (Male)", "ຍິງ (Female)"].map(processLabel),
+                datasets: [
+                    { label: 'ກ່ອນການຝຶກ (Pre-Test)', data: [], backgroundColor: '#35675D', borderRadius: 4 },
+                    { label: 'ຫຼັງການຝຶກ (Post-Test)', data: [], backgroundColor: '#BF5A38', borderRadius: 4 }
+                ]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false, layout: { padding: { top: 20 } },
+                plugins: { legend: { position: 'bottom' }, tooltip: standardTooltipConfig, datalabels: { formatter: v => v > 0 ? v + '%' : '' } },
+                scales: { y: { beginAtZero: true, max: 115, title: { display: true, text: 'Average Score (%)' } } }
+            }
+        });
+
+        const ctxQuestion = document.getElementById('questionChart').getContext('2d');
+        window.myCharts.question = new Chart(ctxQuestion, {
+            type: 'line',
+            data: {
+                labels: Array.from({length: 20}, (_, i) => `Q${i+1}`).map(processLabel),
+                datasets: [
+                    {
+                        label: 'ຄະແນນກ່ອນການຝຶກ (Pre-Test Score %)', data: [], borderColor: '#35675D',
+                        backgroundColor: 'transparent', borderWidth: 2, borderDash: [5, 5], pointBackgroundColor: '#35675D', fill: false, tension: 0.3,
+                        datalabels: { color: '#35675D', align: 'bottom', offset: 6 }
+                    },
+                    {
+                        label: 'ຄະແນນຫຼັງການຝຶກ (Post-Test Score %)', data: [], borderColor: '#BF5A38',
+                        backgroundColor: 'rgba(191, 90, 56, 0.2)', borderWidth: 3, pointBackgroundColor: '#BF5A38', fill: true, tension: 0.3,
+                        datalabels: { color: '#8A3F25', align: 'top', offset: 6 } 
+                    }
+                ]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false, layout: { padding: { top: 20, bottom: 20 } },
+                interaction: { mode: 'index', intersect: false },
+                plugins: { legend: { position: 'bottom' }, tooltip: questionTooltipConfig, datalabels: { font: { size: 10, weight: 'bold' }, formatter: v => Math.round(v) } },
+                scales: { y: { beginAtZero: true, max: 115, title: { display: true, text: 'Correct Answer Rate (%)' } }, x: { ticks: { maxRotation: 45, minRotation: 45 } } }
+            }
+        });
+
+        // ==========================================
+        // Raw Data Processor
+        // ==========================================
+        function processRawData(rows, defaultTopic) {
+            if(!rows || rows.length === 0) throw new Error("ບໍ່ພົບຂໍ້ມູນໃນໄຟລ໌ (No data found in the file).");
+
+            const firstRow = rows[0] || {};
+            const fileKeys = Object.keys(firstRow);
+            
+            let topic = defaultTopic;
+            currentExportTopic = topic.replace(/[^a-zA-Z0-9_\u0E80-\u0EFF]/g, "_");
+            document.getElementById('dashboard-title').innerHTML = `ການປະເມີນກ່ອນ ແລະ ຫຼັງ ການຝຶກອົບຮົມ<br><span class="text-2xl md:text-3xl text-slate-500 font-bold block mt-2">${topic}</span>`;
+
+            const dateKeys = fileKeys.filter(k => {
+                let lower = String(k).toLowerCase().replace(/\s+/g, '');
+                return lower.includes('date') || lower === 'start' || lower === 'ເວລາ' || lower.includes('101');
+            });
+            
+            // Update keys to be more robust for different file formats
+            const nameK = fileKeys.find(k => {
+                let str = String(k).toLowerCase();
+                return (str.includes('201') || str.includes('ຊື່') || str.includes('name') || str.includes('ພະນັກງານ') || str.includes('participant')) && !str.includes('from') && !str.includes('organization');
+            });
+            const genK = fileKeys.find(k => {
+                let str = String(k).toLowerCase();
+                return str.includes('202') || str.includes('ເພດ') || str.includes('sex') || str.includes('gender');
+            });
+            
+            // ບູລິມະສິດຊອກຫາຖັນ "is this pre or post test?" ກ່ອນໝູ່
+            let typeK = fileKeys.find(k => {
+                let str = String(k).toLowerCase();
+                return str.includes('is this pre or post test') || str === 'type' || str === 'ປະເພດ';
+            });
+            if (!typeK) {
+                typeK = fileKeys.find(k => {
+                    let str = String(k).toLowerCase();
+                    return str.includes('208') || str.includes('ກ່ອນ') || str.includes('ຫຼັງ') || str.includes('pre') || str.includes('post') || str.includes('test') || str.includes('phase') || str.includes('period') || str.includes('status');
+                });
+            }
+
+            const partFromK = fileKeys.find(k => {
+                let str = String(k).toLowerCase();
+                return str.includes('207') || str.includes('organization') || str.includes('participant from') || str.includes('ພາກສ່ວນ') || str.includes('ແຂວງ') || str.includes('ໂຮງໝໍ') || str.includes('facility') || str.includes('location');
+            });
+            
+            // Dynamically calculate number of questions
+            const calKeys = [];
+            let maxQ = 1;
+            while(fileKeys.find(k => k && String(k).replace(/\s+/g, '').toLowerCase() === 'cal'+maxQ)) {
+                calKeys.push(fileKeys.find(k => k && String(k).replace(/\s+/g, '').toLowerCase() === 'cal'+maxQ));
+                maxQ++;
+            }
+            if (calKeys.length === 0) {
+                maxQ = 1;
+                while(fileKeys.find(k => k && String(k).replace(/\s+/g, '').toLowerCase() === 'score'+maxQ)) {
+                    calKeys.push(fileKeys.find(k => k && String(k).replace(/\s+/g, '').toLowerCase() === 'score'+maxQ));
+                    maxQ++;
+                }
+            }
+            if (calKeys.length === 0) {
+                maxQ = 1;
+                while(fileKeys.find(k => k && String(k).replace(/\s+/g, '').toLowerCase() === 'q'+maxQ)) {
+                    calKeys.push(fileKeys.find(k => k && String(k).replace(/\s+/g, '').toLowerCase() === 'q'+maxQ));
+                    maxQ++;
+                }
+            }
+            
+            MAX_QUESTIONS = calKeys.length > 0 ? calKeys.length : 20;
+
+            const totalK = fileKeys.find(k => {
+                let str = String(k).toLowerCase();
+                return str === 'total' || str === 'score' || str.includes('ລວມ') || str.includes('total score') || str.includes('totalcal');
+            });
+
+            // ==========================================
+            // Auto-Translator for English Questions (ລະບົບແປພາສາອັດຕະໂນມັດ)
+            // ==========================================
+            function translateToLao(text) {
+                let lowerText = text.toLowerCase();
+                
+                if (lowerText.includes('hidden sheet') || lowerText.includes('bridge') || lowerText.includes('staging area')) {
+                    return 'ຊີດ (Sheet) ທີ່ຖືກເຊື່ອງໄວ້ອັນໃດ ທີ່ເຮັດໜ້າທີ່ເປັນ "ຂົວຕໍ່" ຫຼື ພື້ນທີ່ພັກຂໍ້ມູນ ເພື່ອຈັດຮູບແບບຂໍ້ມູນຫຼັງຈາກທີ່ຖືກປ້ອນເຂົ້າໃນ Checklist ກ່ອນທີ່ຈະຖືກສົ່ງໄປຍັງ Database?';
+                }
+                if (lowerText.includes('path') || lowerText.includes('moves') || lowerText.includes('pathway')) {
+                    return 'ເສັ້ນທາງ (path) ໃດທີ່ອະທິບາຍໄດ້ຢ່າງຖືກຕ້ອງກ່ຽວກັບວິທີການເຄື່ອນຍ້າຍຂໍ້ມູນ (ເສັ້ນທາງຂໍ້ມູນ) ຜ່ານເຄື່ອງມືດັ່ງກ່າວ?';
+                }
+                if (lowerText.includes('data validation') || lowerText.includes('validation')) {
+                    return 'ຄຸນສົມບັດ Data Validation ໃນ Excel ໃຊ້ເພື່ອຈຸດປະສົງຫຍັງໃນເຄື່ອງມື RDQA?';
+                }
+                if (lowerText.includes('absolute reference') || lowerText.includes('lock cell')) {
+                    return 'ສັນຍະລັກໃດທີ່ຖືກນໍາໃຊ້ເພື່ອສ້າງ "ການອ້າງອີງແບບຕາຍຕົວ" (ການລັອກເຊລ) ໃນສູດ Excel?';
+                }
+                if (lowerText.includes('#spill')) {
+                    return 'ຖ້າທ່ານເຫັນຂໍ້ຜິດພາດ #SPILL! ໃນ Excel, ສ່ວນໃຫຍ່ມັນມັກເກີດບັນຫາຫຍັງ?';
+                }
+                if (lowerText.includes('keyboard shortcut') || lowerText.includes('excel table')) {
+                    return 'ປຸ່ມລັດເທິງແປ້ນພິມ (keyboard shortcut) ແມ່ນຫຍັງ ເພື່ອປ່ຽນຊ່ວງຂໍ້ມູນໃຫ້ເປັນ "Excel Table"?';
+                }
+                if (lowerText.includes('"if" statement') || (lowerText.includes('if') && lowerText.includes('formula'))) {
+                    return 'ຈຸດປະສົງຫຼັກຂອງການນຳໃຊ້ຄຳສັ່ງ "IF" ໃນສູດ Excel ແມ່ນຫຍັງ?';
+                }
+                if (lowerText.includes('dropdown menu') || lowerText.includes('drop-down')) {
+                    return 'ຄຸນສົມບັດ (ເຄື່ອງມື) ໃດຂອງ Excel ທີ່ຖືກນໍາໃຊ້ເພື່ອສ້າງ "ເມນູແບບດຶງລົງ" (dropdown menus)?';
+                }
+                if (lowerText.includes('"submit" button') || lowerText.includes('submit button')) {
+                    return 'ຈຸດປະສົງຫຼັກຂອງປຸ່ມ "Submit" (ສົ່ງ) ຢູ່ໃນໜ້າລາຍການກວດສອບ (Checklist) ແມ່ນຫຍັງ?';
+                }
+                if (lowerText.includes('conditional formatting')) {
+                    return 'ການໃຊ້ Conditional Formatting ໃນ Excel ຊ່ວຍໃນວຽກງານ RDQA ແນວໃດ?';
+                }
+                if (lowerText.includes('pivot table')) {
+                    return 'ຂັ້ນຕອນການສ້າງ Pivot Table ເພື່ອສະຫຼຸບຂໍ້ມູນ RDQA ປະກອບມີຫຍັງແດ່?';
+                }
+                if (lowerText.includes('vlookup')) {
+                    return 'ສູດ VLOOKUP ໃຊ້ເພື່ອຈຸດປະສົງຫຍັງໃນການກວດສອບຂໍ້ມູນ?';
+                }
+                if (lowerText.includes('protect sheet') || lowerText.includes('protecting')) {
+                    return 'ວິທີການປ້ອງກັນ (Protect Sheet) ໂຄງສ້າງຂອງເຄື່ອງມື RDQA ບໍ່ໃຫ້ຖືກແກ້ໄຂແມ່ນຫຍັງ?';
+                }
+                if (lowerText.includes('count cells') || lowerText.includes('specific condition') || lowerText.includes('countif')) {
+                    return 'ຟັງຊັນ (Function) ໃດທີ່ໃຊ້ເພື່ອນັບຈໍານວນເຊລທີ່ມີເງື່ອນໄຂສະເພາະ?';
+                }
+                if (lowerText.includes('data link') || lowerText.includes('linking data')) {
+                    return 'ຂໍ້ດີຂອງການໃຊ້ການເຊື່ອມໂຍງຂໍ້ມູນ (Data Link) ລະຫວ່າງຫຼາຍໆຊີດແມ່ນຫຍັງ?';
+                }
+
+                // ສົ່ງຄືນຄ່າເດີມຖ້າບໍ່ກົງກັບເງື່ອນໄຂພາສາອັງກິດຂ້າງເທິງ
+                return text;
+            }
+
+            // =========================================================
+            // Dynamically extract question descriptions from headers
+            // =========================================================
+            window.QUESTION_DESCRIPTIONS = [];
+            
+            // ວິທີໃໝ່: ຈັບຄູ່ຖັນຄຳຖາມ ອີງຕາມຕຳແໜ່ງຂອງຖັນ Cal1 
+            // (ຖັນຄຳຖາມຕົວຈິງຈະຢູ່ກ່ອນໜ້າກຸ່ມຖັນ Cal ສະເໝີ)
+            let firstCalKey = calKeys.length > 0 ? calKeys[0] : null;
+            let firstCalIndex = firstCalKey ? fileKeys.indexOf(firstCalKey) : -1;
+
+            if (firstCalIndex !== -1 && firstCalIndex >= MAX_QUESTIONS) {
+                // ດຶງເອົາຫົວຖັນ ຕາມລຳດັບກ່ອນໜ້າ cal1 (ຕົວຢ່າງ: ຖ້າ cal1 ຢູ່ AF, ມັນຈະຖອຍໄປດຶງ R ມາເປັນ Q1)
+                let qStartIndex = firstCalIndex - MAX_QUESTIONS;
+                for (let i = 0; i < MAX_QUESTIONS; i++) {
+                    let qHeader = fileKeys[qStartIndex + i];
+                    if (qHeader) {
+                        let originalText = String(qHeader).trim();
+                        // ຕັດ Q ທາງໜ້າອອກກ່ອນ ແລ້ວແປພາສາ
+                        let cleanedText = originalText.replace(new RegExp(`^Q${i + 1}\\.?\\s*`, 'i'), '');
+                        let translated = translateToLao(cleanedText);
+                        window.QUESTION_DESCRIPTIONS.push(`Q${i + 1}. ${translated}`);
+                    } else {
+                        window.QUESTION_DESCRIPTIONS.push(`Q${i + 1}`);
+                    }
+                }
+            } else {
+                // ລະບົບສຳຮອງ (Fallback) ໃນກໍລະນີຫາ cal1 ບໍ່ເຫັນ ຫຼື ຕຳແໜ່ງບໍ່ຖືກ
+                for (let i = 1; i <= MAX_QUESTIONS; i++) {
+                    let qKey = fileKeys.find(k => {
+                        let text = String(k).trim();
+                        return text.startsWith(`Q${i}.`) || text.startsWith(`Q${i} `) || text === `Q${i}`;
+                    });
+                    if (qKey) {
+                        let originalText = String(qKey).trim();
+                        let cleanedText = originalText.replace(new RegExp(`^Q${i}\\.?\\s*`, 'i'), '');
+                        let translated = translateToLao(cleanedText);
+                        window.QUESTION_DESCRIPTIONS.push(`Q${i}. ${translated}`);
+                    } else {
+                        window.QUESTION_DESCRIPTIONS.push(`Q${i}`);
+                    }
+                }
+            }
+
+            let preList = [];
+            let postList = [];
+
+            rows.forEach(row => {
+                let rawDate = "";
+                for (let key of dateKeys) {
+                    if (row[key] != null && String(row[key]).trim() !== "") {
+                        rawDate = String(row[key]).trim();
+                        break;
+                    }
+                }
+
+                let monthYear = "Unspecified Date";
+                if (rawDate) {
+                    if (!isNaN(rawDate) && Number(rawDate) > 20000) {
+                        let d = new Date(Math.round((Number(rawDate) - 25569) * 86400 * 1000));
+                        let m = String(d.getMonth() + 1).padStart(2, '0');
+                        let y = d.getFullYear();
+                        monthYear = `${y}-${m}`;
+                    } else {
+                        let d = new Date(rawDate);
+                        if (!isNaN(d.getTime())) {
+                            let m = String(d.getMonth() + 1).padStart(2, '0');
+                            let y = d.getFullYear();
+                            monthYear = `${y}-${m}`;
+                        } else {
+                            let parts = rawDate.match(/(\d+)/g);
+                            if (parts && parts.length >= 3) {
+                                let y = parts[0].length === 4 ? parts[0] : (parts[2].length === 4 ? parts[2] : "20" + parts[2]);
+                                let m = parts[1].padStart(2, '0');
+                                monthYear = `${y}-${m}`;
+                            }
+                        }
+                    }
+                }
+
+                let name = "";
+                if (nameK && row[nameK] != null) {
+                    name = String(row[nameK]).trim();
+                } else if (fileKeys.length > 1) {
+                    // Fallback to a key that might have a name if column name isn't matched
+                    let fallbackKey = fileKeys.find(k => !k.includes('Q') && !k.includes('cal') && !k.includes('date') && !k.includes('time'));
+                    if (fallbackKey && row[fallbackKey]) name = String(row[fallbackKey]).trim();
+                }
+
+                if (!name) return; // Skip empty rows
+
+                let gender = (genK && row[genK] != null) ? String(row[genK]).trim() : "";
+                
+                let typeStr = "";
+                if (typeK && row[typeK] != null) {
+                    let val = String(row[typeK]).toLowerCase().trim();
+                    if (val.includes('pre') || val.includes('ກ່ອນ') || val === '1' || val === '1.0') typeStr = 'pre';
+                    else if (val.includes('post') || val.includes('ຫຼັງ') || val === '2' || val === '2.0') typeStr = 'post';
+                } else {
+                    // Fallback: Check if any value strictly says pre or post (don't check 1/2 blindly)
+                    for (let k of fileKeys) {
+                        if (row[k] == null) continue;
+                        let val = String(row[k]).toLowerCase().trim();
+                        if (val === 'pre' || val === 'pre-test' || val === 'pre test' || val === 'ກ່ອນ' || val === 'ກ່ອນຮຽນ' || val === 'ກ່ອນການຝຶກ') {
+                            typeStr = 'pre';
+                            break;
+                        }
+                        if (val === 'post' || val === 'post-test' || val === 'post test' || val === 'ຫຼັງ' || val === 'ຫຼັງຮຽນ' || val === 'ຫຼັງການຝຶກ') {
+                            typeStr = 'post';
+                            break;
+                        }
+                    }
+                }
+                
+                let participantFrom = (partFromK && row[partFromK] != null) ? String(row[partFromK]).trim() : "ບໍ່ລະບຸ (Unspecified)";
+
+                let scores = [];
+                let total = 0;
+                
+                if (calKeys.length > 0) {
+                    scores = calKeys.map(k => parseFloat(k && row[k] != null ? row[k] : 0) || 0);
+                    total = scores.reduce((a,b) => a+b, 0);
+                } else {
+                    scores = Array(MAX_QUESTIONS).fill(0);
+                    if (totalK && row[totalK] != null) {
+                        total = parseFloat(row[totalK]) || 0;
+                    }
+                }
+
+                let rec = { name, cleanName: cleanName(name), gender, scores, totalScore: total, participantFrom: participantFrom, monthYear: monthYear };
+
+                if(typeStr === 'pre') {
+                    preList.push(rec);
+                } else if (typeStr === 'post') {
+                    postList.push(rec);
+                }
+            });
+
+            if (preList.length === 0) {
+                let availableCols = fileKeys.slice(0, 10).join(', ') + (fileKeys.length > 10 ? '...' : '');
+                throw new Error(`ບໍ່ພົບຂໍ້ມູນກ່ອນການຝຶກ (Pre-training). ກະລຸນາກວດສອບວ່າຖັນ "is this pre or post test?" ໃນໄຟລ໌ Excel ຂອງທ່ານມີຂໍ້ມູນຄຳວ່າ Pre ຫຼຶ Post ຄົບຖ້ວນແລ້ວຫຼືຍັງ. ຖັນໃນໄຟລ໌ຂອງທ່ານມີ: ${availableCols}`);
+            }
+
+            let processedData = preList.map(pre => {
+                let post = postList.find(p => p.cleanName === pre.cleanName);
+                return {
+                    name: pre.name,
+                    cleanName: pre.cleanName, 
+                    gender: pre.gender,
+                    monthYear: pre.monthYear,
+                    participantFrom: pre.participantFrom,
+                    preScore: parseFloat(pre.totalScore) || 0,
+                    postScore: post ? (parseFloat(post.totalScore) || 0) : null,
+                    preScores: pre.scores,
+                    postScores: post ? post.scores : Array(MAX_QUESTIONS).fill(null)
+                };
+            });
+
+            window.allDashboardData = processedData;
+            
+            // Save to local storage
+            localStorage.setItem('imam_dashboard_data', JSON.stringify({
+                topic: topic,
+                data: processedData,
+                maxQuestions: MAX_QUESTIONS,
+                questionDescriptions: window.QUESTION_DESCRIPTIONS
+            }));
+            
+            initializeDashboardWithData();
+        }
+
+        function initializeDashboardWithData() {
+            updateDropdownOptions('init');
+            applyFilters();
+            showToast('ໂຫຼດຂໍ້ມູນສຳເລັດແລ້ວ! (Data loaded successfully!)', 'success');
+        }
+
+        // --- Cross-filtering Dropdown Logic ---
+        function updateDropdownOptions(source) {
+            const partFromSelect = document.getElementById('participantFromFilter');
+            const monthSelect = document.getElementById('monthFilter');
+
+            const valPartFrom = partFromSelect ? partFromSelect.value : "";
+            const valMonth = monthSelect ? monthSelect.value : "";
+
+            const formatMonth = (val) => {
+                if(val === "Unspecified Date") return val;
+                const parts = val.split('-');
+                if(parts.length === 2) return `${parts[1]}-${parts[0]}`; 
+                return val;
+            };
+
+            // Update Participant From Options
+            if (source !== 'participantFrom' && partFromSelect) {
+                let dataForPart = window.allDashboardData;
+                if (valMonth) dataForPart = dataForPart.filter(d => d.monthYear === valMonth);
+                
+                const parts = [...new Set(dataForPart.map(d => d.participantFrom).filter(Boolean))].sort();
+                partFromSelect.innerHTML = '<option value="">-- ຜູ້ເຂົ້າຮ່ວມທັງໝົດຈາກ (All Participants From) --</option>' + parts.map(p => `<option value="${p}">${p}</option>`).join('');
+                
+                if (parts.includes(valPartFrom)) partFromSelect.value = valPartFrom;
+                else partFromSelect.value = "";
+            }
+
+            // Update Month Options
+            if (source !== 'month' && monthSelect) {
+                let dataForMonth = window.allDashboardData;
+                if (valPartFrom) dataForMonth = dataForMonth.filter(d => d.participantFrom === valPartFrom);
+
+                const months = [...new Set(dataForMonth.map(d => d.monthYear).filter(Boolean))].sort().reverse();
+                monthSelect.innerHTML = '<option value="">-- ທຸກໆເດືອນ (All Months) --</option>' + months.map(m => `<option value="${m}">${formatMonth(m)}</option>`).join('');
+                
+                if (source === 'init') {
+                     monthSelect.value = ""; // Default to all months on initial load
+                } else if (months.includes(valMonth)) {
+                    monthSelect.value = valMonth;
+                } else {
+                    monthSelect.value = "";
+                }
+            }
+        }
+
+        function applyFilters() {
+            const monthSelect = document.getElementById('monthFilter');
+            const selectedMonth = monthSelect ? monthSelect.value : "";
+            const selectedPartFrom = document.getElementById('participantFromFilter').value;
+
+            let filtered = window.allDashboardData;
+
+            if (selectedMonth) filtered = filtered.filter(d => d.monthYear === selectedMonth);
+            if (selectedPartFrom) filtered = filtered.filter(d => d.participantFrom === selectedPartFrom);
+
+            let subtitleText = "ທຸກພື້ນທີ່ (All Areas)";
+            let parts = [];
+            if (selectedPartFrom) parts.push(`ຈາກ (From): ${selectedPartFrom}`);
+            
+            if (parts.length > 0) {
+                subtitleText = parts.join(', ');
+            }
+            
+            if (selectedMonth) {
+                const formatMonth = (val) => {
+                    if(val === "Unspecified Date") return "ວັນທີບໍ່ລະບຸ (Unspecified Date)";
+                    const p = val.split('-');
+                    if(p.length === 2) return `${p[1]}-${p[0]}`;
+                    return val;
+                };
+                subtitleText += ` (ເດືອນ/Date: ${formatMonth(selectedMonth)})`;
+            }
+
+            document.getElementById('dashboard-subtitle').innerHTML = `<span class="font-semibold text-blue-700">&#128205; ${subtitleText}</span>`;
+
+            updateDashboard(filtered);
+        }
+
+        // Event Listeners for Filters
+        const partFromFilterElem = document.getElementById('participantFromFilter');
+        if (partFromFilterElem) {
+            partFromFilterElem.addEventListener('change', function() {
+                updateDropdownOptions('participantFrom');
+                applyFilters();
+            });
+        }
+
+        const monthFilterElem = document.getElementById('monthFilter');
+        if (monthFilterElem) {
+            monthFilterElem.addEventListener('change', function() {
+                updateDropdownOptions('month');
+                applyFilters();
+            });
+        }
+
+        // --- Update Dashboard KPIs and Charts ---
+        function updateDashboard(data) {
+            let totalPre = data.length;
+            let sumPre = 0;
+            let sumPost = 0;
+            let countPost = 0;
+
+            let mPreSum=0, mPreCount=0, mPostSum=0, mPostCount=0;
+            let fPreSum=0, fPreCount=0, fPostSum=0, fPostCount=0;
+
+            let distPre = [0,0,0,0,0];
+            let distPost = [0,0,0,0,0];
+
+            let qPre = Array(MAX_QUESTIONS).fill(0);
+            let qPost = Array(MAX_QUESTIONS).fill(0);
+
+            data.forEach(d => {
+                sumPre += d.preScore;
+
+                let isMale = d.gender.toLowerCase().includes('ຊາຍ') || d.gender === '1' || d.gender.toLowerCase() === 'm' || d.gender.toLowerCase() === 'male';
+                let isFemale = d.gender.toLowerCase().includes('ຍິງ') || d.gender === '2' || d.gender.toLowerCase() === 'f' || d.gender.toLowerCase() === 'female';
+                if(isMale) { mPreSum += d.preScore; mPreCount++; }
+                if(isFemale) { fPreSum += d.preScore; fPreCount++; }
+
+                // Using percentages for distribution to support dynamic MAX_QUESTIONS
+                let pctPre = (d.preScore / MAX_QUESTIONS) * 100;
+                if(pctPre<=25) distPre[0]++; 
+                else if(pctPre<=50) distPre[1]++; 
+                else if(pctPre<=75) distPre[2]++; 
+                else if(pctPre<100) distPre[3]++; 
+                else distPre[4]++;
+
+                for(let i=0; i<MAX_QUESTIONS; i++) { if(d.preScores[i]) qPre[i]++; }
+
+                if(d.postScore !== null) { 
+                    sumPost += d.postScore;
+                    countPost++;
+
+                    if(isMale) { mPostSum += d.postScore; mPostCount++; }
+                    if(isFemale) { fPostSum += d.postScore; fPostCount++; }
+
+                    let pctPost = (d.postScore / MAX_QUESTIONS) * 100;
+                    if(pctPost<=25) distPost[0]++; 
+                    else if(pctPost<=50) distPost[1]++; 
+                    else if(pctPost<=75) distPost[2]++; 
+                    else if(pctPost<100) distPost[3]++; 
+                    else distPost[4]++;
+
+                    for(let i=0; i<MAX_QUESTIONS; i++) { if(d.postScores[i]) qPost[i]++; }
+                }
+            });
+
+            let avgPrePct = totalPre > 0 ? (sumPre / totalPre / MAX_QUESTIONS) * 100 : 0;
+            let avgPostPct = countPost > 0 ? (sumPost / countPost / MAX_QUESTIONS) * 100 : 0;
+            let diffPct = avgPostPct - avgPrePct;
+
+            document.getElementById('kpi-count').innerText = totalPre;
+            document.getElementById('kpi-pre-pct').innerText = avgPrePct.toFixed(1) + "%";
+            document.getElementById('kpi-pre-score').innerText = (totalPre > 0 ? (sumPre/totalPre) : 0).toFixed(2) + ` / ${MAX_QUESTIONS} ຄະແນນ (pts)`;
+            document.getElementById('kpi-post-pct').innerText = avgPostPct.toFixed(1) + "%";
+            document.getElementById('kpi-post-score').innerText = (countPost > 0 ? (sumPost/countPost) : 0).toFixed(2) + ` / ${MAX_QUESTIONS} ຄະແນນ (pts)`;
+            document.getElementById('kpi-diff').innerText = (diffPct > 0 ? "+" : "") + diffPct.toFixed(1) + "%";
+
+            let mPreAvg = mPreCount > 0 ? (mPreSum/mPreCount/MAX_QUESTIONS)*100 : 0;
+            let mPostAvg = mPostCount > 0 ? (mPostSum/mPostCount/MAX_QUESTIONS)*100 : 0;
+            let fPreAvg = fPreCount > 0 ? (fPreSum/fPreCount/MAX_QUESTIONS)*100 : 0;
+            let fPostAvg = fPostCount > 0 ? (fPostSum/fPostCount/MAX_QUESTIONS)*100 : 0;
+            
+            if (window.myCharts && window.myCharts.gender) {
+                window.myCharts.gender.data.datasets[0].data = [Math.round(mPreAvg), Math.round(fPreAvg)];
+                window.myCharts.gender.data.datasets[1].data = [Math.round(mPostAvg), Math.round(fPostAvg)];
+                window.myCharts.gender.update();
+            }
+
+            if (window.myCharts && window.myCharts.dist) {
+                window.myCharts.dist.data.datasets[0].data = distPre.map(v => Math.round((v / (totalPre || 1)) * 100));
+                window.myCharts.dist.data.datasets[1].data = distPost.map(v => Math.round((v / (countPost || 1)) * 100));
+                window.myCharts.dist.update();
+            }
+
+            let qPostPctData = qPost.map(v => (v / (countPost || 1)) * 100);
+            
+            if (window.myCharts && window.myCharts.question) {
+                // Update Questions Chart Labels dynamically based on MAX_QUESTIONS
+                window.myCharts.question.data.labels = Array.from({length: MAX_QUESTIONS}, (_, i) => `Q${i+1}`).map(processLabel);
+                window.myCharts.question.data.datasets[0].data = qPre.map(v => (v / (totalPre || 1)) * 100);
+                window.myCharts.question.data.datasets[1].data = qPostPctData;
+                window.myCharts.question.update();
+            }
+
+            // =========================================================
+            // Dynamic Analysis: Bottom 5 Questions
+            // =========================================================
+            let qPrePctData = qPre.map(v => (v / (totalPre || 1)) * 100);
+            
+            document.getElementById('attention-title').innerHTML = `&#9888;&#65039; 3 ຄໍາຖາມທີ່ໄດ້ຄະແນນຕໍ່າ<br><span class="text-sm text-rose-600 font-normal ml-6">Bottom 3 Questions</span>`;
+
+            if (totalPre > 0) {
+                let qAnalysis = qPrePctData.map((prePct, index) => {
+                    let postPct = countPost > 0 ? qPostPctData[index] : null;
+                    return {
+                        qNum: index + 1,
+                        prePct: prePct,
+                        postPct: postPct,
+                        preCount: qPre[index],
+                        postCount: countPost > 0 ? qPost[index] : null,
+                        desc: window.QUESTION_DESCRIPTIONS[index] || `Topic for Q${index + 1}`
+                    };
+                });
+
+                // ກັ່ນຕອງເອົາສະເພາະຂໍ້ທີ່ຍັງບໍ່ໄດ້ 100% (ຖ້າໄດ້ເຕັມແລ້ວ ບໍ່ຕ້ອງເອົາມາສະແດງໃນຈຸດທີ່ຕ້ອງເອົາໃຈໃສ່)
+                let attentionQuestions = qAnalysis.filter(q => {
+                    let score = q.postCount !== null ? q.postCount : q.preCount;
+                    let maxScore = q.postCount !== null ? countPost : totalPre;
+                    return score < maxScore;
+                });
+
+                // ຈັດລຽງຕາມເປີເຊັນຈາກໜ້ອຍຫາຫຼາຍ
+                attentionQuestions.sort((a, b) => {
+                    let pctA = a.postCount !== null ? (a.postCount / countPost) : (a.preCount / totalPre);
+                    let pctB = b.postCount !== null ? (b.postCount / countPost) : (b.preCount / totalPre);
+                    return pctA - pctB;
+                });
+                
+                // ເອົາພຽງ 3 ອັນດັບຄະແນນຕໍ່າສຸດ ທີ່ຍັງບໍ່ທັນເຕັມ 100%
+                let bottom3Questions = attentionQuestions.slice(0, 3);
+                
+                let attentionHtml = '';
+                
+                if (bottom3Questions.length === 0) {
+                    attentionHtml = `<li><span class="font-semibold text-emerald-600">ດີເລີດ (Excellent):</span> ບໍ່ມີຄຳຖາມໃດທີ່ມີຄະແນນຕໍ່າ. ທຸກຂໍ້ຜ່ານເກນໄດ້ດີເລີດ. (All questions scored perfectly.)</li>`;
+                } else {
+                    bottom3Questions.forEach(q => {
+                        let scoreText = q.postCount !== null 
+                            ? `ກ່ອນ: ${q.preCount} &#10145;&#65039; ຫຼັງ: ${q.postCount}` 
+                            : `ກ່ອນ: ${q.preCount}`;
+                        
+                        // ສະແດງຄຳຖາມເຕັມ (Full Question Description) ໂດຍບໍ່ຕັດຫຍັງອອກ
+                        attentionHtml += `<li class="mb-2"><span class="font-semibold text-rose-800">(${scoreText}):</span> <span class="text-rose-600 font-medium">${q.desc}</span></li>`;
+                    });
+                }
+                document.getElementById('attention-list').innerHTML = attentionHtml;
+
+                let recHtml = '';
+                if (bottom3Questions.length === 0) {
+                    recHtml = `<li>&#127881; ຄະແນນທຸກຂໍ້ຢູ່ໃນເກນທີ່ດີເລີດ. (All questions scored excellently.)</li>
+                               <li>ແນະນຳໃຫ້ມີການຝຶກອົບຮົມໃນໜ້າວຽກ (OJT) ພາຍໃນ 3-6 ເດືອນຂ້າງໜ້າເພື່ອຮັກສາຄຸນນະພາບ. (It is recommended to conduct On-the-job training within the next 3-6 months to maintain quality.)</li>`;
+                } else {
+                    recHtml = `<li><span class="font-semibold">ການແກ້ໄຂບັນຫາຫຼັກ (Main Priority):</span> ຫົວຂໍ້ <b>"${bottom3Questions[0].desc}"</b> ແມ່ນຈຸດອ່ອນທີ່ສຸດ, ຄວນຈັດການຝຶກອົບຮົມແບບປະຕິບັດຕົວຈິງເພີ່ມເຕີມ (On-the-job training) ສະເພາະຫົວຂໍ້ນີ້.</li>`;
+                    if (bottom3Questions.length > 1) {
+                        recHtml += `<li><span class="font-semibold">ການຈັບຄູ່ຮຽນຮູ້ (Peer Coaching):</span> ສຳລັບຫົວຂໍ້ <b>"${bottom3Questions[1].desc}"</b> ສາມາດໃຫ້ພະນັກງານທີ່ເຂົ້າໃຈດີແລ້ວ ຊ່ວຍອະທິບາຍ ແລະ ແນະນຳເພື່ອນຮ່ວມງານ.</li>`;
+                    }
+                    recHtml += `<li><span class="font-semibold">ເອກະສານອ້າງອີງ (Handouts):</span> ຄວນພິມຂັ້ນຕອນ ຫຼື ວິທີການກ່ຽວກັບຄຳຖາມທີ່ໄດ້ຄະແນນຕໍ່າ ເພື່ອແຈກຢາຍໃຫ້ຜູ້ເຂົ້າຮ່ວມເອົາໄວ້ເບິ່ງຕອນເຮັດວຽກຕົວຈິງ.</li>`;
+                }
+                document.getElementById('recommendation-list').innerHTML = recHtml;
+            } else {
+                document.getElementById('attention-list').innerHTML = `<li class="text-slate-400 italic">ບໍ່ມີຂໍ້ມູນສຳລັບການວິເຄາະ (No data available to analyze.)</li>`;
+                document.getElementById('recommendation-list').innerHTML = `<li class="text-slate-400 italic">ບໍ່ມີຂໍ້ມູນສຳລັບການວິເຄາະ (No data available to analyze.)</li>`;
+            }
+
+            // =========================================================
+            // Dynamic Analysis: Bottom 3 Questions (Table)
+            // =========================================================
+            let questionScores = [];
+            for (let i = 0; i < MAX_QUESTIONS; i++) {
+                let preC = qPre[i] || 0;
+                let postC = countPost > 0 ? (qPost[i] || 0) : null;
+                
+                // ຄິດໄລ່ເປັນເປີເຊັນເພື່ອການຈັດລຽງທີ່ຍຸດຕິທຳ (Percentage based sort)
+                let sortPct = postC !== null ? (postC / countPost) : (preC / totalPre);
+                
+                questionScores.push({
+                    qNum: i + 1,
+                    desc: window.QUESTION_DESCRIPTIONS[i] || `Q${i + 1}`,
+                    preCount: preC,
+                    postCount: postC,
+                    sortPct: sortPct
+                });
+            }
+
+            // ຈັດລຽງຕາມເປີເຊັນຕໍ່າສຸດ
+            questionScores.sort((a, b) => a.sortPct - b.sortPct);
+            let bottom3Qs = questionScores.slice(0, 3);
+            
+            let bottom3Html = '';
+            if (bottom3Qs.length === 0) {
+                bottom3Html = '<p class="text-slate-400 italic p-4 text-center">ບໍ່ມີຂໍ້ມູນ (No data available).</p>';
+            } else {
+                bottom3Html = `<div class="overflow-x-auto"><table class="min-w-full text-left text-sm text-slate-600">
+                    <thead class="bg-slate-50 text-slate-700 font-medium border-b border-slate-200">
+                        <tr>
+                            <th class="px-4 py-3 text-center leading-tight w-16">ອັນດັບ<br><span class="text-xs text-slate-500 font-normal">(Rank)</span></th>
+                            <th class="px-4 py-3 text-center leading-tight">ຄະແນນທີ່ຕໍ່າ<br><span class="text-xs text-slate-500 font-normal">(Low Score)</span></th>
+                            <th class="px-4 py-3 text-center leading-tight whitespace-nowrap">ຜູ້ທີ່ໄດ້ຄະແນນຕໍ່າກ່ອນການຝຶກ<br><span class="text-xs text-slate-500 font-normal">(Low Pre Score)</span></th>
+                            <th class="px-4 py-3 text-center leading-tight whitespace-nowrap">ຜູ້ທີ່ໄດ້ຄະແນນຕໍ່າຫຼັງການຝຶກ<br><span class="text-xs text-slate-500 font-normal">(Low Post Score)</span></th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100">`;
+                bottom3Qs.forEach((q, index) => {
+                    let rank = index + 1;
+                    let postDisplay = q.postCount !== null ? q.postCount : '-';
+                    
+                    // ດຶງເອົາຄ່າຕົວເລກຄະແນນທີ່ຕໍ່າສຸດມາສະແດງ
+                    let lowScoreVal = q.postCount !== null ? q.postCount : q.preCount;
+                    
+                    bottom3Html += `
+                        <tr class="hover:bg-slate-50">
+                            <td class="px-4 py-3 text-center font-bold text-slate-700">${rank}</td>
+                            <td class="px-4 py-3 text-center font-bold text-rose-800">${lowScoreVal}</td>
+                            <td class="px-4 py-3 text-center font-bold text-rose-600">${q.preCount}</td>
+                            <td class="px-4 py-3 text-center text-[#35675D] font-bold">${postDisplay}</td>
+                        </tr>`;
+                });
+                bottom3Html += `</tbody></table></div>`;
+            }
+            document.getElementById('lowest-scores-container').innerHTML = bottom3Html;
+        }
+
+        // --- File Upload Event ---
+        document.getElementById('fileUpload').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const filename = file.name.replace(/\.[^/.]+$/, "");
+            const label = document.getElementById('fileUploadLabel');
+            const originalContent = label.innerHTML;
+            
+            label.innerHTML = '<span class="text-lg">&#8987;</span><span class="leading-tight text-sm text-left">ກຳລັງອ່ານໄຟລ໌...<br><span class="text-xs font-normal">Reading file...</span></span>';
+            label.classList.replace('bg-blue-600', 'bg-slate-500');
+            label.classList.replace('hover:bg-blue-700', 'hover:bg-slate-600');
+            
+            showToast('ກຳລັງປະມວນຜົນ... (Processing data...)', 'loading');
+
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                try {
+                    const data = new Uint8Array(event.target.result);
+                    const workbook = XLSX.read(data, {type: 'array'});
+                    
+                    const sheetName = workbook.SheetNames[0]; 
+                    const rows = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]);
+                    
+                    processRawData(rows, filename);
+
+                    label.innerHTML = originalContent;
+                    label.classList.replace('bg-slate-500', 'bg-blue-600');
+                    label.classList.replace('hover:bg-slate-600', 'hover:bg-blue-700');
+                    e.target.value = ''; 
+
+                } catch (error) {
+                    console.error("Full Error:", error);
+                    showToast('ຂໍ້ຜິດພາດ (Error): ' + (error.message || 'ຮູບແບບໄຟລ໌ບໍ່ຖືກຕ້ອງ (Invalid file format)'), 'error');
+                    label.innerHTML = originalContent;
+                    label.classList.replace('bg-slate-500', 'bg-blue-600');
+                    label.classList.replace('hover:bg-slate-600', 'hover:bg-blue-700');
+                    e.target.value = '';
+                }
+            };
+            
+            reader.onerror = function() {
+                showToast('ຂໍ້ຜິດພາດ: ບໍ່ສາມາດອ່ານໄຟລ໌ນີ້ຈາກ Browser ໄດ້. (Error: Cannot read this file from the Browser.)', 'error');
+                label.innerHTML = originalContent;
+                label.classList.replace('bg-slate-500', 'bg-blue-600');
+                label.classList.replace('hover:bg-slate-600', 'hover:bg-blue-700');
+            };
+            
+            reader.readAsArrayBuffer(file);
+        });
+
+        // --- Export PDF Function ---
+        document.getElementById('exportBtn').addEventListener('click', function() {
+            if(!window.allDashboardData || window.allDashboardData.length === 0) return;
+            
+            showToast('ກຳລັງສ້າງໄຟລ໌ PDF, ກະລຸນາລໍຖ້າ... (Generating PDF file, please wait...)', 'loading');
+
+            const controlsSection = document.getElementById('controls-section');
+            const filterSection = document.getElementById('filter-section');
+            const navBar = document.getElementById('main-nav');
+            const footer = document.getElementById('main-footer');
+            
+            if(controlsSection) controlsSection.style.display = 'none';
+            if(filterSection) filterSection.style.display = 'none';
+            if(navBar) navBar.style.display = 'none';
+            if(footer) footer.style.display = 'none';
+
+            window.scrollTo(0, 0);
+
+            const element = document.body;
+            const opt = {
+                margin:       10, 
+                filename:     currentExportTopic + '_Dashboard.pdf',
+                image:        { type: 'jpeg', quality: 0.98 },
+                html2canvas:  { scale: 2, useCORS: true, scrollY: 0 },
+                jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            };
+
+            html2pdf().set(opt).from(element).save().then(() => {
+                if(controlsSection) controlsSection.style.display = 'flex';
+                if(filterSection) filterSection.style.display = 'flex';
+                if(navBar) navBar.style.display = 'block';
+                if(footer) footer.style.display = 'block';
+                
+                showToast('ດາວໂຫຼດໄຟລ໌ PDF ສຳເລັດແລ້ວ! (PDF file downloaded successfully!)', 'success');
+            }).catch(err => {
+                if(controlsSection) controlsSection.style.display = 'flex';
+                if(filterSection) filterSection.style.display = 'flex';
+                if(navBar) navBar.style.display = 'block';
+                if(footer) footer.style.display = 'block';
+                
+                showToast('ເກີດຂໍ້ຜິດພາດໃນການສ້າງ PDF (Error generating PDF)', 'error');
+                console.error(err);
+            });
+        });
+
+        // ==========================================
+        // Window OnLoad & LocalStorage Check
+        // ==========================================
+        window.onload = function() {
+            // First check if user has previously uploaded data saved in browser memory
+            const savedDataString = localStorage.getItem('imam_dashboard_data');
+            
+            if (savedDataString) {
+                try {
+                    const savedState = JSON.parse(savedDataString);
+                    if (savedState && savedState.data && savedState.data.length > 0) {
+                        window.allDashboardData = savedState.data;
+                        currentExportTopic = savedState.topic;
+                        if(savedState.maxQuestions) MAX_QUESTIONS = savedState.maxQuestions;
+                        if(savedState.questionDescriptions) window.QUESTION_DESCRIPTIONS = savedState.questionDescriptions;
+                        
+                        document.getElementById('dashboard-title').innerHTML = `ການປະເມີນກ່ອນ ແລະ ຫຼັງ ການຝຶກອົບຮົມ<br><span class="text-2xl md:text-3xl text-slate-500 font-bold block mt-2">${savedState.topic}</span>`;
+                        initializeDashboardWithData();
+                        return; // Exit here if loaded successfully
+                    }
+                } catch(e) {
+                    console.error("Failed to parse saved data, clearing it out", e);
+                    localStorage.removeItem('imam_dashboard_data');
+                }
+            }
+
+            // Fallback to Embedded CSV Script Tag if local storage is empty
+            const csvScriptTag = document.getElementById('csv-data');
+            if (csvScriptTag && csvScriptTag.textContent.trim().length > 50) {
+                const rawCSVData = csvScriptTag.textContent.trim();
+                
+                try {
+                    const workbook = XLSX.read(rawCSVData, {type: 'string'});
+                    const sheetName = workbook.SheetNames[0]; 
+                    const rows = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]);
+                    
+                    if (rows && rows.length > 0) {
+                        processRawData(rows, "RDQA Tool Modifications");
+                    }
+                } catch(e) {
+                    console.error("Error loading embedded data:", e);
+                    showToast("ຂໍ້ຜິດພາດໃນການໂຫຼດຂໍ້ມູນທີ່ຝັງໄວ້. ກະລຸນາກວດສອບຮູບແບບ CSV. (Error loading embedded data. Please check CSV format.)", "error");
+                }
+            } else {
+                document.getElementById('dashboard-subtitle').innerHTML = `<span class="font-semibold text-blue-700">&#128205; ກະລຸນາອັບໂຫຼດໄຟລ໌ Excel ຫຼຶ CSV ຂອງທ່ານ... (Please upload your Excel or CSV file...)</span>`;
+            }
+        }
+    </script>
+
+    <!-- 
+      === ບ່ອນວາງຂໍ້ມູນ CSV ສຳລັບການຝັງຂໍ້ມູນ === 
+      ດຶງຂໍ້ມູນໃໝ່ຈາກ RDQA_tool_modification.csv ທີ່ອັບໂຫຼດລ່າສຸດມາແທນທີ່ໃຫ້ແລ້ວ 
+    -->
+    <script id="csv-data" type="text/csv">
+start,end,note1,"Q101. ວັນທີປະເມີນ","Q102. ສະຖານທີ່","Q103. ລະຫັດແຂວງ","Q104. ລະຫັດເມືອງ","Q201. ຊື່ ແລະ ນາມສະກຸນ","Q202. ເພດ","Q203. ປະເພດການທົດສອບ (Pre/Post)","Q204. ລະຫັດສະຖານທີ່","Q205. ລະຫັດຕຳແໜ່ງ","Q205a. ຕຳແໜ່ງ","Q206. ປະສົບການ","Q207. ພາກສ່ວນ/ອົງການ","Q208. ສະຖານະ",note3,"Q1. ສັນຍະລັກໃດທີ່ຖືກນໍາໃຊ້ເພື່ອສ້າງ ""ການອ້າງອີງແບບຕາຍຕົວ"" (ການລັອກເຊລ) ໃນສູດ Excel?","Q2. ຖ້າທ່ານເຫັນຂໍ້ຜິດພາດ #SPILL!  ໃນ Excel, ສ່ວນໃຫຍ່ມັນມັກເກີດບັນຫາຫຍັງ?","Q3. ປຸ່ມລັດເທິງແປ້ນພິມ (keyboard shortcut) ແມ່ນຫຍັງ ເພື່ອປ່ຽນຊ່ວງຂໍ້ມູນໃຫ້ເປັນ ""Excel Table ສຳລັບການວິເຄາະ","Q4. ຈຸດປະສົງຫຼັກຂອງການນຳໃຊ້ຄຳສັ່ງ ""IF"" ໃນສູດ Excel ແມ່ນຫຍັງ?","Q5. ຄຸນສົມບັດ (ເຄື່ອງມື) ໃດຂອງ Excel ທີ່ຖືກນໍາໃຊ້ເພື່ອສ້າງ ""ເມນູແບບດຶງລົງ (dropdown menus)""","Q6. ຈຸດປະສົງຫຼັກຂອງປຸ່ມ ""Submit"" (ສົ່ງ) ຢູ່ໃນໜ້າລາຍການກວດສອບ (Checklist) ແມ່ນຫຍັງ?","Q7. ເສັ້ນທາງ (path) ໃດທີ່ອະທິບາຍໄດ້ຢ່າງຖືກຕ້ອງກ່ຽວກັບວິທີການເຄື່ອນຍ້າຍຂໍ້ມູນ (ເສັ້ນທາງຂໍ້ມູນ) ຜ່ານເຄື່ອງມືດັ່ງກ່າວ","Q8. ການໃຊ້ Conditional Formatting ໃນ Excel ຊ່ວຍໃນວຽກງານ RDQA ແນວໃດ?","Q9. ຄຸນສົມບັດ Data Validation ໃນ Excel ໃຊ້ເພື່ອຈຸດປະສົງຫຍັງໃນເຄື່ອງມື RDQA?","Q10. ຊີດ (Sheet) ທີ່ຖືກເຊື່ອງໄວ້ອັນໃດ ທີ່ເຮັດໜ້າທີ່ເປັນ ""ຂົວຕໍ່"" ຫຼື ພື້ນທີ່ພັກຂໍ້ມູນ ເພື່ອຈັດຮູບແບບຂໍ້ມູນຫຼັງຈາກທີ່ຖືກປ້ອນເຂົ້າໃນ Checklist ກ່ອນທີ່ຈະຖືກສົ່ງໄປຍັງ Database?","Q11. ສູດ VLOOKUP ໃຊ້ເພື່ອຈຸດປະສົງຫຍັງໃນການກວດສອບຂໍ້ມູນ?","Q12. ວິທີການປ້ອງກັນ (Protect Sheet) ໂຄງສ້າງຂອງເຄື່ອງມື RDQA ບໍ່ໃຫ້ຖືກແກ້ໄຂແມ່ນຫຍັງ?","Q13. ຟັງຊັນ (Function) ໃດທີ່ໃຊ້ເພື່ອນັບຈໍານວນເຊລທີ່ມີເງື່ອນໄຂສະເພາະ?","Q14. ຂໍ້ດີຂອງການໃຊ້ການເຊື່ອມໂຍງຂໍ້ມູນ (Data Link) ລະຫວ່າງຫຼາຍໆຊີດແມ່ນຫຍັງ?",cal1,cal2,cal3,cal4,cal5,cal6,cal7,cal8,cal9,cal10,cal11,cal12,cal13,cal14,totalcal,_id,_uuid,_submission_time,_validation_status,_notes,_status,_submitted_by,__version__,_tags,meta/rootUuid,_index
+2026-04-06,2026-04-06,,2026-04-06,S vangvieng,1,104,Sengdeuan,1,1,104,99,MEL,7,JSI,1,,1b,2c,3c,4b,5b,6b,7c,8b,9b,10c,11c,12b,13c,14c,1,1,1,1,1,1,1,1,1,1,1,1,1,1,14,764114039,b5f1d1cd-4e56-4bf7-a7ff,2026-04-06,,,submitted_via_web,,vRoUheburNQjdyUCqXYJ9k,,uuid:72e58c93-9251-4f72-975a-9e7a0137c567,16
+2026-04-06,2026-04-06,,2026-04-06,ເອັສ ວັງວຽງ,1,104,ລັດຕະນາ ພົມມະວົງສາ,2,2,205,99,PMEL,7,JSI,1,,1b,2c,3c,4b,5a,6b,7c,8b,9b,10c,11c,12c,13c,14c,1,1,1,1,0,1,1,1,1,1,1,0,1,1,12,764115590,d1cc047c-88f0-4fbe-8c1f-a8b369b8d6e9,2026-04-06,,,submitted_via_web,,vRoUheburNQjdyUCqXYJ9k,,uuid:d1cc047c-88f0-4fbe-8c1f-a8b369b8d6e9,17
+2026-04-06,2026-04-06,,2026-04-06,S vangvieng,1,104,Sengdeuan,1,1,104,99,MEL,7,JSI,2,,1b,2c,3c,4b,5b,6b,7c,8b,9b,10c,11c,12b,13c,14c,1,1,1,1,1,1,1,1,1,1,1,1,1,1,14,764114040,c5f1d1cd-4e56-4bf7-a7fe,2026-04-06,,,submitted_via_web,,vRoUheburNQjdyUCqXYJ9k,,uuid:82e58c93-9251-4f72-975a-9e7a0137c567,18
+2026-04-06,2026-04-06,,2026-04-06,ເອັສ ວັງວຽງ,1,104,ລັດຕະນາ ພົມມະວົງສາ,2,2,205,99,PMEL,7,JSI,2,,1b,2c,3c,4b,5b,6b,7c,8b,9b,10c,11c,12b,13c,14c,1,1,1,1,1,1,1,1,1,1,1,1,1,1,14,764115591,e1cc047c-88f0-4fbe-8c1f-a8b369b8d6e8,2026-04-06,,,submitted_via_web,,vRoUheburNQjdyUCqXYJ9k,,uuid:e1cc047c-88f0-4fbe-8c1f-a8b369b8d6e9,19
+    </script>
+</body>
+</html>
